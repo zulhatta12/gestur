@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GestureBio - Perkenalan Diri dengan Gerakan Jari (Finger Gesture)</title>
+  <meta name="description" content="Website interaktif perkenalan diri menggunakan pengenalan gerakan jari (finger gesture recognition) berbasis AI & MediaPipe. Siap deploy ke Vercel.">
+  
+  <!-- Google Fonts: Outfit & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- MediaPipe Libraries from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <i class="fa-solid fa-hand-sparkles"></i>
+        </div>
+        <div class="brand-text">
+          <h1 class="brand-title">Gesture<span>Bio</span></h1>
+          <p class="brand-subtitle">AI Finger Gesture Self-Introduction</p>
+        </div>
+      </div>
+
+      <!-- Action Badges / Controls -->
+      <div class="header-actions">
+        <div class="status-badge" id="cameraStatusBadge">
+          <span class="status-dot"></span>
+          <span id="cameraStatusText">Inisialisasi Kamera...</span>
+        </div>
+
+        <button class="icon-btn" id="soundToggleBtn" title="Aktifkan / Matikan Suara Perkenalan (Voice Speech)" aria-label="Toggle Voice">
+          <i class="fa-solid fa-volume-high"></i>
+          <span class="tooltip">Voice: ON</span>
+        </button>
+
+        <button class="icon-btn" id="mirrorToggleBtn" title="Cermin Kamera (Mirror)" aria-label="Toggle Mirror">
+          <i class="fa-solid fa-arrows-left-right"></i>
+        </button>
+
+        <button class="icon-btn" id="editProfileBtn" title="Ubah Biodata & Profil" aria-label="Edit Profile">
+          <i class="fa-solid fa-user-pen"></i>
+        </button>
+
+        <button class="icon-btn" id="guideToggleBtn" title="Daftar Gestur Jari" aria-label="Daftar Gestur">
+          <i class="fa-solid fa-circle-question"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="main-layout">
+      
+      <!-- Video & Canvas Stage -->
+      <div class="viewport-wrapper">
+        <div class="video-container" id="videoContainer">
+          
+          <!-- Hidden source video stream -->
+          <video id="webcam" playsinline muted autoplay></video>
+          
+          <!-- Visual Canvas for Landmarks & HUD -->
+          <canvas id="output_canvas"></canvas>
+
+          <!-- Hacker/OpenCV Style HUD Overlay (Seperti di Foto Referensi) -->
+          <div class="opencv-hud" id="opencvHud">
+            <div class="hud-top-left">
+              <div class="hud-line hud-gesture">
+                <span class="hud-label">Gesture:</span>
+                <span class="hud-val" id="hudGestureName">Menunggu Tangan...</span>
+              </div>
+              <div class="hud-line hud-status">
+                <span class="hud-label">Status:</span>
+                <span class="hud-val" id="hudStatus">Ready</span>
+              </div>
+              <div class="hud-line hud-meta">
+                <span>FPS: <strong id="hudFps">0</strong></span>
+                <span>Detections: <strong id="hudCount">0</strong></span>
+                <span>Tangan: <strong id="hudHandedness">-</strong></span>
+              </div>
+            </div>
+            
+            <div class="hud-finger-indicators" id="fingerIndicators">
+              <div class="finger-pill" data-finger="thumb">Jempol</div>
+              <div class="finger-pill" data-finger="index">Telunjuk</div>
+              <div class="finger-pill" data-finger="middle">Tengah</div>
+              <div class="finger-pill" data-finger="ring">Manis</div>
+              <div class="finger-pill" data-finger="pinky">Kelingking</div>
+            </div>
+          </div>
+
+          <!-- Futuristic Card Overlay: Menampilkan Biodata Perkenalan Diri Terkini -->
+          <div class="intro-card-overlay" id="introCardOverlay">
+            <div class="card-glass" id="activeIntroCard">
+              <div class="card-gesture-icon" id="cardGestureIcon">🤟</div>
+              <div class="card-content">
+                <span class="card-category" id="cardCategory">Identitas Utama</span>
+                <h2 class="card-title" id="cardTitle">Fikri Pradipa</h2>
+                <p class="card-desc" id="cardDesc">Halo! Saya mahasiswa dan pengembang web yang suka mengeksplorasi teknologi AI dan interaksi komputer interaktif.</p>
+                <div class="card-tags" id="cardTags">
+                  <span class="tag">#WebDev</span>
+                  <span class="tag">#AI</span>
+                  <span class="tag">#MediaPipe</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Loading & Fallback Overlay -->
+          <div class="loading-overlay" id="loadingOverlay">
+            <div class="loader-content">
+              <div class="spinner"></div>
+              <h3>Memuat Model AI MediaPipe...</h3>
+              <p>Mohon izinkan akses webcam saat browser memintanya.</p>
+              <button class="btn btn-secondary" id="btnTrySimulation" style="margin-top: 15px;">
+                <i class="fa-solid fa-play"></i> Coba Mode Simulasi (Tanpa Kamera)
+              </button>
+            </div>
+          </div>
+
+          <!-- Floating Snapshot Controls -->
+          <div class="viewport-controls">
+            <button class="btn btn-glass" id="btnCapture" title="Ambil Foto Pose & Biodata">
+              <i class="fa-solid fa-camera"></i> <span>Capture Pose</span>
+            </button>
+            <button class="btn btn-glass" id="btnToggleHudStyle" title="Ganti Gaya Tampilan">
+              <i class="fa-solid fa-palette"></i> <span>Gaya HUD</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gesture Guide Drawer / Sidebar -->
+      <aside class="sidebar-guide" id="sidebarGuide">
+        <div class="sidebar-header">
+          <h3><i class="fa-solid fa-hand-holding-hand"></i> Panduan Gestur Jari</h3>
+          <button class="close-btn" id="closeGuideBtn">&times;</button>
+        </div>
+        <p class="sidebar-desc">Tunjukkan gerakan jari ini ke arah kamera untuk menampilkan bagian perkenalan diri:</p>
+
+        <div class="gesture-list">
+          
+          <!-- Gesture 1: I Love You / Rock Sign (Seperti di Foto) -->
+          <div class="gesture-item active" data-gesture-key="rock_love">
+            <div class="gesture-emoji">🤟</div>
+            <div class="gesture-info">
+              <div class="gesture-name">I Love You / Rock <span>(Foto Referensi)</span></div>
+              <div class="gesture-meaning">Nama & Perkenalan Utama</div>
+              <div class="gesture-fingers">Jempol + Telunjuk + Kelingking</div>
+            </div>
+          </div>
+
+          <!-- Gesture 2: 1 Jari (Pointing) -->
+          <div class="gesture-item" data-gesture-key="pointing">
+            <div class="gesture-emoji">☝️</div>
+            <div class="gesture-info">
+              <div class="gesture-name">Satu Jari (Telunjuk)</div>
+              <div class="gesture-meaning">Pendidikan & Asal Daerah</div>
+              <div class="gesture-fingers">Hanya Jari Telunjuk Naik</div>
+            </div>
+          </div>
+
+          <!-- Gesture 3: 2 Jari (Peace / Victory) -->
+          <div class="gesture-item" data-gesture-key="peace">
+            <div class="gesture-emoji">✌️</div>
+            <div class="gesture-info">
+              <div class="gesture-name">Peace / Dua Jari</div>
+              <div class="gesture-meaning">Keahlian & Tech Stack</div>
+              <div class="gesture-fingers">Telunjuk + Jari Tengah</div>
+            </div>
+          </div>
+
+          <!-- Gesture 4: 5 Jari (Open Palm) -->
+          <div class="gesture-item" data-gesture-key="open_palm">
+            <div class="gesture-emoji">🖐️</div>
+            <div class="gesture-info">
+              <div class="gesture-name">Telapak Terbuka (Lima Jari)</div>
+              <div class="gesture-meaning">Salam Kenal & Sambutan</div>
+              <div class="gesture-fingers">Semua Jari Terbuka Lebar</div>
+            </div>
+          </div>
+
+          <!-- Gesture 5: Thumbs Up -->
+          <div class="gesture-item" data-gesture-key="thumbs_up">
+            <div class="gesture-emoji">👍</div>
+            <div class="gesture-info">
+              <div class="gesture-name">Jempol ke Atas (Thumbs Up)</div>
+              <div class="gesture-meaning">Hobi, Minat & Passion</div>
+              <div class="gesture-fingers">Jempol Naik, Jari Lain Menekuk</div>
+            </div>
+          </div>
+
+          <!-- Gesture 6: OK / Pinch Sign -->
+          <div class="gesture-item" data-gesture-key="ok_sign">
+            <div class="gesture-emoji">👌</div>
+            <div class="gesture-info">
+              <div class="gesture-name">OK / Pinch Sign</div>
+              <div class="gesture-meaning">Kontak & Media Sosial</div>
+              <div class="gesture-fingers">Ujung Jempol + Telunjuk Bersentuhan</div>
+            </div>
+          </div>
+
+          <!-- Gesture 7: Kepalan Tangan (Fist) -->
+          <div class="gesture-item" data-gesture-key="fist">
+            <div class="gesture-emoji">✊</div>
+            <div class="gesture-info">
+              <div class="gesture-name">Kepalan Tangan (Fist)</div>
+              <div class="gesture-meaning">Mode Siaga / Status Ready</div>
+              <div class="gesture-fingers">Semua Jari Tertutup Rapat</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="badge-vercel">
+            <i class="fa-brands fa-cloudflare"></i> Siap Deploy Vercel (100% Client-Side)
+          </div>
+        </div>
+      </aside>
+
+    </main>
+
+    <!-- Modal: Edit Profile / Biodata Perkenalan -->
+    <div class="modal-backdrop" id="editProfileModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3><i class="fa-solid fa-id-card"></i> Kustomisasi Biodata Perkenalan</h3>
+          <button class="close-btn" id="closeProfileModal">&times;</button>
+        </div>
+        <form id="profileForm" class="modal-form">
+          <div class="form-group">
+            <label for="inputName">Nama Lengkap (Muncul saat gestur 🤟):</label>
+            <input type="text" id="inputName" required placeholder="Contoh: Fikri Pradipa">
+          </div>
+          <div class="form-group">
+            <label for="inputRole">Peran / Profesi Singkat:</label>
+            <input type="text" id="inputRole" placeholder="Contoh: Web Developer & AI Enthusiast">
+          </div>
+          <div class="form-group">
+            <label for="inputEducation">Pendidikan / Asal (Muncul saat gestur ☝️):</label>
+            <input type="text" id="inputEducation" placeholder="Contoh: Mahasiswa Teknik Informatika • Jakarta">
+          </div>
+          <div class="form-group">
+            <label for="inputSkills">Keahlian & Tech Stack (Muncul saat gestur ✌️):</label>
+            <input type="text" id="inputSkills" placeholder="Contoh: JavaScript, Python, MediaPipe, HTML/CSS">
+          </div>
+          <div class="form-group">
+            <label for="inputHobbies">Hobi & Minat (Muncul saat gestur 👍):</label>
+            <input type="text" id="inputHobbies" placeholder="Contoh: Eksplorasi AI, Ngoding Kreatif, Gaming">
+          </div>
+          <div class="form-group">
+            <label for="inputGreeting">Salam Sambutan (Muncul saat gestur 🖐️):</label>
+            <input type="text" id="inputGreeting" placeholder="Contoh: Halo semuanya! Senang bisa bertemu dengan kalian.">
+          </div>
+          <div class="form-group">
+            <label for="inputContact">Kontak & Medsos (Muncul saat gestur 👌):</label>
+            <input type="text" id="inputContact" placeholder="Contoh: Instagram: @fikripradipa | GitHub: fikri">
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="btnResetDefault">Kembalikan Default</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Simpan Biodata</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Snapshot Captured Image Preview -->
+    <div class="modal-backdrop" id="snapshotModal">
+      <div class="modal-card snapshot-card">
+        <div class="modal-header">
+          <h3><i class="fa-solid fa-image"></i> Foto Pose & Biodata</h3>
+          <button class="close-btn" id="closeSnapshotModal">&times;</button>
+        </div>
+        <div class="snapshot-preview-container">
+          <img id="snapshotImg" alt="Snapshot pose perkenalan">
+        </div>
+        <div class="modal-actions">
+          <a id="downloadSnapshotBtn" class="btn btn-primary" download="perkenalan-gesture.png">
+            <i class="fa-solid fa-download"></i> Unduh Foto
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Main Logic -->
+  <script src="script.js"></script>
+</body>
+</html>
