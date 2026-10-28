@@ -10,13 +10,13 @@
   // --- Profile Storage & Defaults ---
   const STORAGE_KEY = 'gesturebio_profile_data';
   const DEFAULT_PROFILE = {
-    name: "M dzul hatta syukur",
+    name: "zulhatta",
     role: "Web Developer & AI Enthusiast",
-    education: "Mahasiswa Teknik Informatika • Jakarta",
-    skills: "JavaScript, Python, OpenCV, MediaPipe, HTML/CSS",
-    hobbies: "Eksplorasi AI, Ngoding Kreatif, Gaming",
+    education: "Mahasiswa Teknik Informatika • bekasi sman 1 tarumajaya",
+    skills: "pecut ai , sibuk ngoding, Open jual beli,pemula , anak magang",
+    hobbies: "Eksplorasi AI, Ngoding ai, Gaming",
     greeting: "Halo semuanya! Senang bisa berkenalan dengan kalian semua.",
-    contact: "Instagram: @fikripradipa | GitHub: fikripradipa"
+    contact: "Instagram: @zlhtaa | GitHub: zul hata syukur"
   };
 
   let profile = loadProfile();
